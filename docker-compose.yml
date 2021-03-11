@@ -1,0 +1,17 @@
+version: "2.1"
+services:
+    vapoursynth-yuuno:
+        image: yyfyyf/vapoursynth-yuuno:v0.4
+        container_name: vapoursynth-yuuno
+        environment:
+            - PUID=1000
+            - PGID=1000
+        volumes:
+            - /YOUR/ENCODE/PATH:/encode
+            - ./scripts:/scripts
+        ports:
+            - 8888:8888
+        restart: unless-stopped
+        tty: true
+        entrypoint: ["./jupyter.sh"]
+        working_dir: /scripts
