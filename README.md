@@ -31,6 +31,12 @@ Please refer to [WhaleHu/Encode-guide-frds](https://github.com/WhaleHu/Encode-gu
 eac3to-demux /PATH/TO/BDMV
 ```
 
+## How to encode TV series
+
+```
+encode_series "/PATH/TO/SERIES/REMUX"
+```
+
 ## How to convert dts to ac3
 
 ```
@@ -63,7 +69,7 @@ docker pull yyfyyf/vapoursynth-yuuno:v0.6
 version: "3.7"
 services:
     vapoursynth-yuuno:
-        image: yyfyyf/vapoursynth-yuuno:v0.6
+        image: yyfyyf/vapoursynth-yuuno:v0.7
         container_name: vapoursynth-yuuno
         environment:
             - PUID=1000
