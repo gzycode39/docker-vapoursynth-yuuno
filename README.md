@@ -57,40 +57,16 @@ eac3to "xxx.dtsma" "xxx.ac3"
 
 #### 1.Docker部署
 
-##### ①.拉取镜像：
+##### ①.拉取文件：
 
 ```
-docker pull yyfyyf/vapoursynth-yuuno:v0.6
+git clone https://github.com/gzycode39/docker-vapoursynth-yuuno.git
 ```
 
-##### ②.在压片目录创建docker-compose.yml
+##### ②.进入项目目录
 
 ```
-version: "3.7"
-services:
-    vapoursynth-yuuno:
-        image: yyfyyf/vapoursynth-yuuno:v0.7
-        container_name: vapoursynth-yuuno
-        environment:
-            - PUID=1000
-            - PGID=1000
-        volumes:
-            - /home/krita/encode/path:/encode
-            - ./scripts:/scripts
-        ports:
-            - 18888:8888
-        deploy:
-            resources:
-                limits:
-                  cpus: '8'
-                  memory: 64G
-                reservations:
-                  cpus: '6'
-                  memory: 32G
-        restart: unless-stopped
-        tty: true
-        entrypoint: ["./jupyter.sh"]
-        working_dir: /scripts
+cd docker-vapoursynth-yuuno
 ```
 
 ##### ③.启动容器：
