@@ -1,7 +1,7 @@
 version: "2.1"
 services:
     vapoursynth-yuuno:
-        image: yyfyyf/vapoursynth-yuuno:v0.9
+        image: yyfyyf/vapoursynth-yuuno:v1.0
         container_name: vapoursynth-yuuno
         environment:
             - PUID=1000
