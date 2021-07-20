@@ -1,5 +1,19 @@
 # Docker-VapourSynth-Yuuno
 
+## FRDS压制简明教程
+
+1. 自行准备Linux环境与docker环境，包括docker-compose
+2. `git clone https://github.com/gzycode39/docker-vapoursynth-yuuno.git`
+3. `cd docker-vapoursynth-yuuno`
+4. 将docker-compose.yml中的`/YOUR/ENCODE/PATH`修改为你的工作目录（即原盘所在目录），假设原盘名为`HLWYYDS.2021.HLW`，宿主机目录结构为`/home/hlw/HLW/HLWYYDS.2021.HLW/`，则工作目录应为`/home/hlw/HLW`
+5. `docker-compose up -d`
+6. `docker exec -it vapoursynth-yuuno /bin/bash`
+7. `frds /encode/HLWYYDS.2021.HLW/`
+8. 按照提示选择轨道
+9. 耐心等待提取完成，在浏览器输入`你的机器ip:8888`，打开名为`HLWYYDS.2021.HLW`的文件，修改切边条数，有需要可自行添加脏边修复代码，在浏览器中预览确认无误后，回到命令行界面按任意键继续
+10. 进入宿主机目录`/home/hlw/HLW/out-HLWYYDS.2021.HLW`查看成片，种子及mediainfo位于`torrent`目录下
+11. 发布成片
+
 ## Software Versions
 
 - python3: 3.8.5
