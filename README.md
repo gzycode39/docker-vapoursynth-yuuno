@@ -10,7 +10,7 @@
 6. `docker exec -it vapoursynth-yuuno /bin/bash`
 7. `frds /encode/HLWYYDS.2021.HLW/`
 8. 按照提示选择轨道
-9. 耐心等待提取完成，在浏览器输入`你的机器ip:8888`，打开名为`HLWYYDS.2021.HLW`的文件，修改切边条数，有需要可自行添加脏边修复代码，在浏览器中预览确认无误后，回到命令行界面按任意键继续
+9. 耐心等待提取完成，在浏览器输入`你的机器ip:8888`，打开名为`HLWYYDS.2021.HLW`的文件，修改第9行`border=  xxx`切边条数，有需要可自行添加脏边修复代码，在浏览器中预览确认无误后，回到命令行界面按任意键继续
 10. 进入宿主机目录`/home/hlw/HLW/out-HLWYYDS.2021.HLW`查看成片，种子及mediainfo位于`torrent`目录下
 11. 发布成片
 
