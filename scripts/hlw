@@ -359,7 +359,7 @@ def demux(path):
         elif audio[2] == "ffmpeg":
             if audio[3] == "eac3":
                 ffmpeg_cmd = '"%s" -i "%s" -map 0:%d -c:a eac3 -b:a 640k -dsurex_mode 2 "%s_%d%s.%s"' % (
-                ffmpeg, mkv, audio[0] - 1, title, audio[0], audio[1], audio[3])
+                    ffmpeg, mkv, audio[0] - 1, title, audio[0], audio[1], audio[3])
             else:
                 print("Audio format error %d: %s" % (audio[0], audio[3]))
                 exit(-1)
@@ -406,14 +406,15 @@ def generate_merge_script(name, group="Hydraulic"):
         year = re.search("\.\d{4}\.", title)
         if x264:
             cmd = 'mkvmerge -o "%s/%s.mkv" \\\n   --title "%s" \\\n' % (
-            output_dir, title[0:year.span()[1]] + "{}p.BluRay.DD5.1.x264-{}".format(name, group),
-            title[0:year.span()[0]].replace(".", " ") + " [" + year.group(0).strip(".") + "] {}p BluRay-{}".format(name,
-                                                                                                                   group))
+                output_dir, title[0:year.span()[1]] + "{}p.BluRay.DD5.1.x264-{}".format(name, group),
+                title[0:year.span()[0]].replace(".", " ") + " [" + year.group(0).strip(".") + "] {}p BluRay-{}".format(
+                    name,
+                    group))
         else:
             cmd = 'mkvmerge -o "%s/%s.mkv" \\\n   --title "%s" \\\n' % (
-            output_dir, title[0:year.span()[1]] + "1080p.BluRay.x265.10bit.{}-FRDS".format(group),
-            title[0:year.span()[0]].replace(".", " ") + " [" + year.group(0).strip(
-                ".") + "] BluRay 1080p {}-FRDS".format(group))
+                output_dir, title[0:year.span()[1]] + "1080p.BluRay.x265.10bit.{}-FRDS".format(group),
+                title[0:year.span()[0]].replace(".", " ") + " [" + year.group(0).strip(
+                    ".") + "] BluRay 1080p {}-FRDS".format(group))
         if not x264:
             cmd += '   --ui-language zh_CN \\\n'
         cmd += '   --chapters "%s_%d.txt" \\\n' % (title, chapter_track)
@@ -441,7 +442,7 @@ def generate_merge_script(name, group="Hydraulic"):
     return merge_script
 
 
-def test_crf(name, codec, crf_begin, crf_end, target, step=1, crf_init=True, old=None):
+def test_crf(name, codec, crf_begin, crf_end, target, step=1, crf_init=True, old: dict = None):
     if crf_init:
         crf_init = crf_begin
     cwd = os.getcwd()
@@ -453,8 +454,8 @@ def test_crf(name, codec, crf_begin, crf_end, target, step=1, crf_init=True, old
         os.system("rm -rf crf")
         os.chdir(vstest_path)
         os.system("python3 vstest.py -codec {} -extract 85:2000:10000 --crf [{}/{}/{}] --bframes {}".format(codec,
-                                                                                                            crf_init if crf_init else crf_begin,
-                                                                                                            crf_init if crf_init else crf_end,
+                                                                                                            crf_begin,
+                                                                                                            crf_begin,
                                                                                                             step,
                                                                                                             bframes))
         os.chdir(cwd)
@@ -463,29 +464,35 @@ def test_crf(name, codec, crf_begin, crf_end, target, step=1, crf_init=True, old
     with open("{}.log".format(name)) as f:
         content = f.read()
         crf = list(map(lambda x: float(x), re.findall(r"--crf (.+?) ", content)))
-        frame_rate = list(map(lambda x: float(x), re.findall(r"encoded.+, (.+?) kb", content)))
+        bit_rate = list(map(lambda x: float(x), re.findall(r"encoded.+, (.+?) kb", content)))
+        if abs(bit_rate[0] - target) <= 400:
+            return bit_rate[0]
+
         if old:
-            crf.insert(0, old[0])
-            frame_rate.insert(0, old[1])
-        if frame_rate[0] < target:
+            crf += old['crf']
+            bit_rate += old['bitrate']
+            crf.sort()
+            bit_rate.sort()
+            bit_rate.reverse()
+        if bit_rate[0] < target:
             os.system("rm {}.log".format(name))
-            return test_crf(name, codec, crf_begin - 2, crf_begin, target, step, True)
-        if frame_rate[-1] >= target:
+            return test_crf(name, codec, crf_begin - step, crf_begin - step, target, step,
+                            old={'crf': crf, 'bit_rate': bit_rate})
+        if bit_rate[-1] >= target:
             os.system("rm {}.log".format(name))
-            return test_crf(name, codec, crf_init + 1 if crf_init else crf_end,
-                            crf_init + 2 if crf_init else crf_end + 2, target, step, False,
-                            old=[crf[-1], frame_rate[-1]])
+            return test_crf(name, codec, crf_begin + step, crf_begin + step, target, step,
+                            old={'crf': crf, 'bit_rate': bit_rate})
         num = 0
-        for i in range(len(frame_rate)):
-            if float(frame_rate[i]) < target:
+        for i in range(len(bit_rate)):
+            if float(bit_rate[i]) < target:
                 num = i
                 break
 
-        print(name, frame_rate, crf)
-        f1 = np.polyfit(np.array(frame_rate), np.array(crf), 3)
+        print(name, bit_rate, crf)
+        f1 = np.polyfit(np.array(bit_rate), np.array(crf), 3)
         p1 = np.poly1d(f1)
         target_crf = p1(target)
-        if (target_crf > crf[i] or target_crf < crf[i - 1]):
+        if target_crf > crf[i] or target_crf < crf[i - 1]:
             target_crf = (crf[i] + crf[i - 1]) / 2
 
         target_crf = format(target_crf, '.1f')
@@ -599,7 +606,8 @@ def main():
         encode_script = "{}/{}-{}.sh".format(output_dir, title, k)
         with open(encode_script, "w") as f:
             f.write('vspipe --y4m "%s/%s-%s.vpy" - | %s %s --output "%s/%s-%s.%s" - --crf %s %s' % (
-            output_dir, title, k, encode_tool, demuxer, output_dir, title, k, suffix, crf_dict[k], encode_parameter))
+                output_dir, title, k, encode_tool, demuxer, output_dir, title, k, suffix, crf_dict[k],
+                encode_parameter))
             if frames:
                 f.write(frames)
         merge_script = generate_merge_script(k)
