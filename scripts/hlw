@@ -512,7 +512,7 @@ def detect_crf(name, codec, target):
     if name == "x265":
         crf_begin = 18
         crf_range = 4
-    return test_crf(name, codec, crf_begin, crf_begin + crf_range, target, step)
+    return test_crf(name, codec, crf_begin,target, step)
 
 
 def generate_vpy_helper(name, content, target):
