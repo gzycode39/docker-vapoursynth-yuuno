@@ -355,7 +355,7 @@ def demux(path):
     ffmpeg_cmd = ""
     for audio in audio_track:
         if audio[2] == "eac3to":
-            cmd += ' %d: "%s_%d%s.%s%s"' % (audio[0], title, audio[0], audio[1], audio[3], audio[4])
+            cmd += ' %d: "%s_%d%s.%s"%s' % (audio[0], title, audio[0], audio[1], audio[3], audio[4])
         elif audio[2] == "ffmpeg":
             if audio[3] == "eac3":
                 ffmpeg_cmd = '"%s" -i "%s" -map 0:%d -c:a eac3 -b:a 640k -dsurex_mode 2 "%s_%d%s.%s"' % (
@@ -363,6 +363,7 @@ def demux(path):
             else:
                 print("Audio format error %d: %s" % (audio[0], audio[3]))
                 exit(-1)
+    print(cmd)
     for sub in sub_track:
         cmd += ' %d: "%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
     os.system(cmd)
