@@ -469,7 +469,7 @@ def test_crf(name, codec, crf_begin, target, step=1, old: dict = None):
 
         if old:
             crf += old['crf']
-            bit_rate += old['bitrate']
+            bit_rate += old['bit_rate']
             crf.sort()
             bit_rate.sort()
             bit_rate.reverse()
