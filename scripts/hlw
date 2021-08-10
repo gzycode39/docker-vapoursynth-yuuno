@@ -443,7 +443,7 @@ def generate_merge_script(name, group="Hydraulic"):
     return merge_script
 
 
-def test_crf(name, codec, crf_begin, target, step=1, old: dict = None):
+def test_crf(name, codec, crf_begin, target, step=1, old: dict = None, gap: int = 250):
     cwd = os.getcwd()
     bframes = 16
     if codec == "x265":
@@ -464,8 +464,8 @@ def test_crf(name, codec, crf_begin, target, step=1, old: dict = None):
         content = f.read()
         crf = list(map(lambda x: float(x), re.findall(r"--crf (.+?) ", content)))
         bit_rate = list(map(lambda x: float(x), re.findall(r"encoded.+, (.+?) kb", content)))
-        if abs(bit_rate[0] - target) <= 400:
-            return bit_rate[0]
+        if abs(bit_rate[0] - target) <= gap:
+            return crf[0]
 
         if old:
             crf += old['crf']
