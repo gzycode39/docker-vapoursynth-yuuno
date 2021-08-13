@@ -296,7 +296,7 @@ def init(path):
         if choice:
             tmp_audio_track[1] = choice
         audio_track.append(tmp_audio_track)
-        choice = input('请输入音轨名称（默认为无）')
+        choice = input('请输入音轨名称（默认为无：）')
         if choice:
             tmp_audio_track[5] = choice
     done = False
