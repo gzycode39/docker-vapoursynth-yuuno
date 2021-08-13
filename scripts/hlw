@@ -271,7 +271,7 @@ def init(path):
         print("%s" % line)
     done = False
     while not done:
-        tmp_audio_track = [2, "eng", "eac3to", "ac3", ""]
+        tmp_audio_track = [2, "eng", "eac3to", "ac3", "", '']
         choice = input("请输入你想添加的音轨编号 （输入 q 以停止添加音频）: ")
         if choice == 'q':
             done = True
@@ -296,6 +296,9 @@ def init(path):
         if choice:
             tmp_audio_track[1] = choice
         audio_track.append(tmp_audio_track)
+        choice = input('请输入音轨名称（默认为无）')
+        if choice:
+            tmp_audio_track[5] = choice
     done = False
     choice = ""
     while not done and not choice:
@@ -428,14 +431,18 @@ def generate_merge_script(name, group="Hydraulic"):
             if default_audio:
                 cmd += '   --default-track 0:yes'
                 default_audio = False
-            cmd += '   --language 0:%s "%s_%d%s.%s" \\\n' % (audio[1], title, audio[0], audio[1], audio[3])
+            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.%s" \\\n' % (audio[5], audio[1], title, audio[0], audio[1], audio[3])
         for sub in sub_track:
             if sub[3] and not x264:
                 cmd += '   --default-track 0:yes'
+            else:
+                cmd += '   --default-track 0:no'
             cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.sup" \\\n' % (sub[2], sub[1], title, sub[0], sub[1])
         for sub in external_sub:
             if sub[4] and not x264:
                 cmd += '   --default-track 0:yes'
+            else:
+                cmd += '   --default-track 0:no'
             cmd += ' --track-name 0:"%s" --language 0:%s "%s_%s.%s" \\\n' % (
                 sub[0], sub[1], title, sub[2], sub[3])
         cmd = cmd[:-2]
