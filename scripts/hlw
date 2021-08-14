@@ -241,7 +241,7 @@ def select_resolution():
 def init(path):
     global init_done, chapter_track, video_track, audio_track, sub_track, content, conf, eac_cmd, mkv_extract, is_mkv
     is_mkv = True if path.endswith('mkv') else False  # 判断源是否为mkv文件
-    chapter_track = 1
+    chapter_track = 1 if not is_mkv else 998
     video_track = 2
     audio_track = []
     sub_track = []
