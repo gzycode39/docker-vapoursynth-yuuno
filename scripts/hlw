@@ -360,10 +360,7 @@ def init(path):
 def demux(path):
     global mkv_extract
     cmd = eac_cmd
-    if is_mkv:
-        mkv_extract += 'chapters "%s_%d.txt"' % (title, chapter_track)
-    else:
-        cmd += ' %d: "%s_%d.txt"' % (chapter_track, title, chapter_track)
+
     cmd += ' %d: "%s_%d.264"' % (video_track, title, video_track)
     ffmpeg_cmd = ""
     for audio in audio_track:
@@ -381,9 +378,12 @@ def demux(path):
         if not sub[4]:
             cmd += ' %d: "%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
         else:
-            mkv_extract += '%d:"%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
+            mkv_extract += ' %d:"%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
+    if is_mkv:
+        mkv_extract += ' chapters "%s_%d.txt"' % (title, chapter_track)
+    else:
+        cmd += ' %d: "%s_%d.txt"' % (chapter_track, title, chapter_track)
     os.system(cmd)
-    print(cmd)
     if ffmpeg_cmd:
         os.system(ffmpeg_cmd)
     if is_mkv:
