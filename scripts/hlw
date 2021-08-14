@@ -313,7 +313,6 @@ def init(path):
             break
         if choice.isdigit():
             num = int(choice)
-            num = num - 1 if is_mkv else num  # mkvextract 使用的编号比eac3to少一位
             if check_subtitle(num, content):
                 name = match_lang(num, content)
                 lang = name[:3].lower()
@@ -341,7 +340,7 @@ def init(path):
         if choice:
             if choice == 'Y' or choice == 'y':
                 is_default = True
-
+        num = num - 1 if is_mkv else num  # mkvextract 使用的编号比eac3to少一位
         sub_track.append([num, lang, name, is_default, is_mkv])
         choice = ""
 
