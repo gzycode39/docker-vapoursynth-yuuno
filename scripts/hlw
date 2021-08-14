@@ -152,6 +152,8 @@ audio_track = []
 content = []
 sub_track = []
 eac_cmd = ""
+mkv_extract = ""
+is_mkv = False
 
 conf = {"x265": 7500, "480": 2000, "576": 3500, "720": 6500, "1080": 11000}
 
@@ -237,13 +239,15 @@ def select_resolution():
 
 
 def init(path):
-    global init_done, chapter_track, video_track, audio_track, sub_track, content, conf, eac_cmd
+    global init_done, chapter_track, video_track, audio_track, sub_track, content, conf, eac_cmd, mkv_extract, is_mkv
     chapter_track = 1
     video_track = 2
     audio_track = []
     sub_track = []
+    is_mkv = True if path.endswith('mkv') else False  # 判断源是否为mkv文件
     if not content:
-        eac_cmd = eac3to + ' "' + path + '"'
+        eac_cmd = eac3to + ' "' + title + '"'
+        mkv_extract = 'mkvextract "{}" tracks '.format(title)
         res = os.popen(eac_cmd).read()
         content = []
         for line in res.split("\n")[:-1]:
@@ -251,12 +255,13 @@ def init(path):
                 continue
             content.append(line)
         print('\n'.join(content))
-        mpls_num = 0
-        for line in content:
-            if re.match(r'^(\d)+\).*', line):
-                mpls_num += 1
-        choice = input("请选择mpls (1-%d): " % mpls_num)
-        eac_cmd = eac3to + ' "' + title + '" "%s)"' % choice
+        if not is_mkv:
+            mpls_num = 0
+            for line in content:
+                if re.match(r'^(\d)+\).*', line):
+                    mpls_num += 1
+            choice = input("请选择mpls (1-%d): " % mpls_num)
+            eac_cmd = eac3to + ' "' + title + '" "%s)"' % choice
         res = os.popen(eac_cmd).read()
         content = []
         for line in res.split("\n")[:-1]:
@@ -296,7 +301,7 @@ def init(path):
         if choice:
             tmp_audio_track[1] = choice
         audio_track.append(tmp_audio_track)
-        choice = input('请输入音轨名称（默认为无：）')
+        choice = input('请输入音轨名称（默认为无）：')
         if choice:
             tmp_audio_track[5] = choice
     done = False
@@ -308,6 +313,7 @@ def init(path):
             break
         if choice.isdigit():
             num = int(choice)
+            num = num - 1 if is_mkv else num  # mkvextract 使用的编号比eac3to少一位
             if check_subtitle(num, content):
                 name = match_lang(num, content)
                 lang = name[:3].lower()
@@ -336,7 +342,7 @@ def init(path):
             if choice == 'Y' or choice == 'y':
                 is_default = True
 
-        sub_track.append([num, lang, name, is_default])
+        sub_track.append([num, lang, name, is_default, is_mkv])
         choice = ""
 
     init_done = check_tracks()
@@ -368,10 +374,15 @@ def demux(path):
                 exit(-1)
     print(cmd)
     for sub in sub_track:
-        cmd += ' %d: "%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
+        if not sub[4]:
+            cmd += ' %d: "%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
+        else:
+            mkv_extract += '%d:"%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
     os.system(cmd)
     if ffmpeg_cmd:
         os.system(ffmpeg_cmd)
+    if is_mkv:
+        os.system(mkv_extract)
 
 
 def move(src, dst):
@@ -431,13 +442,8 @@ def generate_merge_script(name, group="Hydraulic"):
             if default_audio:
                 cmd += '   --default-track 0:yes'
                 default_audio = False
-            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.%s" \\\n' % (audio[5], audio[1], title, audio[0], audio[1], audio[3])
-        for sub in sub_track:
-            if sub[3] and not x264:
-                cmd += '   --default-track 0:yes'
-            else:
-                cmd += '   --default-track 0:no'
-            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.sup" \\\n' % (sub[2], sub[1], title, sub[0], sub[1])
+            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.%s" \\\n' % (
+                audio[5], audio[1], title, audio[0], audio[1], audio[3])
         for sub in external_sub:
             if sub[4] and not x264:
                 cmd += '   --default-track 0:yes'
@@ -445,6 +451,12 @@ def generate_merge_script(name, group="Hydraulic"):
                 cmd += '   --default-track 0:no'
             cmd += ' --track-name 0:"%s" --language 0:%s "%s_%s.%s" \\\n' % (
                 sub[0], sub[1], title, sub[2], sub[3])
+        for sub in sub_track:
+            if sub[3] and not x264:
+                cmd += '   --default-track 0:yes'
+            else:
+                cmd += '   --default-track 0:no'
+            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.sup" \\\n' % (sub[2], sub[1], title, sub[0], sub[1])
         cmd = cmd[:-2]
         f.write(cmd)
     return merge_script
@@ -520,7 +532,7 @@ def detect_crf(name, codec, target):
     if name == "x265":
         crf_begin = 18
         crf_range = 4
-    return test_crf(name, codec, crf_begin,target, step)
+    return test_crf(name, codec, crf_begin, target, step)
 
 
 def generate_vpy_helper(name, content, target):
@@ -580,7 +592,7 @@ def main():
     encoder = []
 
     # demux and generate the scripts
-    os.chdir(path + "/..")
+    os.chdir(os.path.dirname(path))
 
     while not init_done:
         init(path)
@@ -618,7 +630,6 @@ def main():
         encoder.append(Encoder(encode_script, merge_script))
 
     for it in encoder:
-        pass
         it.encode()
         it.merge()
 
