@@ -240,11 +240,12 @@ def select_resolution():
 
 def init(path):
     global init_done, chapter_track, video_track, audio_track, sub_track, content, conf, eac_cmd, mkv_extract, is_mkv
+    is_mkv = True if path.endswith('mkv') else False  # 判断源是否为mkv文件
     chapter_track = 1
     video_track = 2
     audio_track = []
     sub_track = []
-    is_mkv = True if path.endswith('mkv') else False  # 判断源是否为mkv文件
+
     if not content:
         eac_cmd = eac3to + ' "' + title + '"'
         mkv_extract = 'mkvextract "{}" tracks '.format(title)
@@ -357,8 +358,12 @@ def init(path):
 
 
 def demux(path):
+    global mkv_extract
     cmd = eac_cmd
-    cmd += ' %d: "%s_%d.txt"' % (chapter_track, title, chapter_track)
+    if is_mkv:
+        mkv_extract += 'chapters "%s_%d.txt"' % (title, chapter_track)
+    else:
+        cmd += ' %d: "%s_%d.txt"' % (chapter_track, title, chapter_track)
     cmd += ' %d: "%s_%d.264"' % (video_track, title, video_track)
     ffmpeg_cmd = ""
     for audio in audio_track:
@@ -378,6 +383,7 @@ def demux(path):
         else:
             mkv_extract += '%d:"%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
     os.system(cmd)
+    print(cmd)
     if ffmpeg_cmd:
         os.system(ffmpeg_cmd)
     if is_mkv:
