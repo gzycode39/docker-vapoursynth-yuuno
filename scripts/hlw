@@ -288,7 +288,7 @@ def init(path):
             continue
         tmp_audio_track[1] = match_lang(tmp_audio_track[0], content)[:3].lower()
         tmp_info = match_info(tmp_audio_track[0], content)
-        if "DTS" in tmp_info or "PCM" in tmp_info:
+        if "DTS" in tmp_info or "PCM" in tmp_info or 'FLAC' in tmp_info:
             tmp_audio_track[2] = "eac3to"
             if "5.1 channels" in tmp_info:
                 tmp_audio_track[3] = "ac3"
