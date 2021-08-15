@@ -277,7 +277,7 @@ def init(path):
         print("%s" % line)
     done = False
     while not done:
-        tmp_audio_track = [2, "eng", "eac3to", "ac3", "", '']
+        tmp_audio_track = [2, "eng", "eac3to", "ac3", "", ""]  # [音轨号,音轨语言,提取方案,目标格式,音频质量调整,音频名称 ]
         choice = input("请输入你想添加的音轨编号 （输入 q 以停止添加音频）: ")
         if choice == 'q':
             done = True
@@ -305,6 +305,13 @@ def init(path):
         choice = input('请输入音轨名称（默认为无）：')
         if choice:
             tmp_audio_track[5] = choice
+        commentary_track = False
+        choice = input("是否进行评论音轨转码？(Y/n) (默认为n）: ")
+        if choice == 'y'.upper():
+            commentary_track = True
+        if commentary_track:
+            tmp_audio_track[4] = " -192"
+            tmp_audio_track[3] = 'ac3'
     done = False
     choice = ""
     while not done and not choice:
