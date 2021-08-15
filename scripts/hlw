@@ -1,0 +1,656 @@
+#!/usr/bin/python3
+import os
+import sys
+import re
+import json
+import time
+import numpy as np
+
+
+def usage():
+    print("\033[1;31mUSAGE: " + sys.argv[0].split("/")[-1] + " /PATH\033[0m")
+
+
+eac3to = "eac3to"
+ffmpeg = "ffmpeg"
+vstest_path = "/usr/local/etc/vstest"
+external_sub = [
+    # [name, language, filanem, suffix, default],
+    # ["chs&eng(srt)", "mul", "chs_eng", "srt", True],
+    # ["cht(ass)", "chi", "cht", "ass", False],
+]
+
+ipy = """
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "%load_ext yuuno"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "3c6b7d52588b4efb9f79bbcfae690802",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "Preview(clip=<vapoursynth.VideoNode object at 0x7fffc7aa3e50>, frame=7422)"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "%%vspreview\\n",
+    "import vapoursynth as vs\\n",
+    "import havsfunc as haf\\n",
+    "import mvsfunc as mvf\\n",
+    "core = vs.core\\n",
+    "core.max_cache_size = 10240\\n",
+    "encode_x264 = False\\n",
+    "src = core.lsmas.LWLibavSource(source=r'REPLACE_PATH')\\n",
+    "src = mvf.Depth(src, 16)\\n",
+    "border = 130\\n",
+    "def zresize(clip, preset=None, width=None, height=None, left=0, right=0, top=0, bottom=0, ar=16 / 9,\\n",
+    "        **kwargs):\\n",
+    "    if preset:\\n",
+    "        if clip.width / clip.height > ar:\\n",
+    "            return zresize(clip, width=ar * preset, left=left, right=right, top=top, bottom=bottom, **kwargs)\\n",
+    "        else:\\n",
+    "            return zresize(clip, height=preset, left=left, right=right, top=top, bottom=bottom, **kwargs)\\n",
+    "\\n",
+    "    if (width is None) and (height is None):\\n",
+    "        width = clip.width\\n",
+    "        height = clip.height\\n",
+    "        rh = rw = 1\\n",
+    "    elif width is None:\\n",
+    "        rh = rw = height / (clip.height - top - bottom) \\n",
+    "    elif height is None:\\n",
+    "        rh = rw = width / (clip.width - left - right)\\n",
+    "    else:\\n",
+    "        rh = height / clip.height\\n",
+    "        rw = width / clip.width\\n",
+    "\\n",
+    "    w = round(((clip.width - left - right) * rw) / 2) * 2\\n",
+    "    h = round(((clip.height - top - bottom) * rh) / 2) * 2\\n",
+    "    resizer = core.resize.Spline36\\n",
+    "    return resizer(clip=clip, width=w, height=h, src_left=left, src_top=top, src_width=clip.width - left - right,\\n",
+    "            src_height=clip.height - top - bottom, dither_type=\\"error_diffusion\\", **kwargs)\\n",
+    "\\n",
+    "src=core.std.Crop(src, left=0, right=0, top=border, bottom=border)\\n",
+    "#src = core.fb.FillBorders(src, 0, 1, 0, 0, mode=\\"fillmargins\\")\\n",
+    "#src = core.edgefixer.Continuity(src,left=4, right=4)\\n",
+    "if encode_x264:\\n",
+    "    src=zresize(src, preset=REPLACE_PRESET)\\n",
+    "src = mvf.Depth(src, 10)\\n",
+    "src.set_output()\\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.8.5"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
+"""
+
+if (len(sys.argv) != 2):
+    usage()
+    exit(-1)
+
+x265_parameter = " -D 10 --preset veryslow --high-tier --ctu 32 --rd 4 --subme 7 --ref 4 --merange=57 --me 3 --qg-size 8 --weightb --pmode --no-rect --no-amp --rskip 0 --tu-intra-depth 4 --tu-inter-depth 4 --range limited --no-open-gop --no-sao --no-early-skip --min-keyint=1 --rc-lookahead 80 --no-cutree --bframes 6 --vbv-bufsize 160000 --vbv-maxrate 160000 --colorprim bt709 --transfer bt709 --colormatrix bt709 --deblock -3:-3 --ipratio 1.3 --pbratio 1.2 --qcomp 0.65 --aq-mode 1 --aq-strength 1 --psy-rd 1.50 --psy-rdoq 1.00 --cbqpoffs -2 --crqpoffs -2"
+x264_parameter = " --preset placebo --level 41 --vbv-bufsize 78125 --vbv-maxrate 62500 --merange 32 --bframes 16 --deblock -3:-3 --no-fast-pskip --rc-lookahead 250 --qcomp 0.60 --psy-rd 1.02:0.00 --aq-mode 3 --aq-strength 0.80 --me umh --b-adapt 2 --direct auto --subme 11 --trellis 2 --no-dct-decimate --no-mbtree --colormatrix bt709 --colorprim bt709 --ipratio 1.30 --pbratio 1.20"
+
+path = sys.argv[1]
+if (not path.startswith("/")):
+    path = os.getcwd() + "/" + path
+
+cwd = os.getcwd()
+title = path.strip("/").split("/")[-1]
+output_dir = "/encode/out-" + title
+os.system("mkdir -p %s" % output_dir)
+init_done = False
+chapter_track = 1
+video_track = 2
+audio_track = []
+content = []
+sub_track = []
+eac_cmd = ""
+mkv_extract = ""
+is_mkv = False
+
+conf = {"x265": 7500, "480": 2000, "576": 3500, "720": 6500, "1080": 11000}
+
+
+def format_time(t):
+    hour = int(t / 3600)
+    t1 = t % 3600
+    minute = int(t1 / 60)
+    return "{}小时{}分".format(hour, minute)
+
+
+def check_tracks():
+    print("您选择的轨道如下：")
+    print("\033[1;31mVideo track: %d\n\033[32mAudio track:\033[0m" % (video_track))
+    for it in audio_track:
+        print("\033[32m%d (%s) (%s => %s)\033[0m" % (it[0], it[1], it[2], it[3]))
+    print("\033[33mSubtitle track:\033[0m")
+    for it in sub_track:
+        is_default = " default" if it[3] else ""
+        print("\033[1;33m%d (%s) (%s)%s\033[0m" % (it[0], it[1], it[2], is_default))
+    if external_sub:
+        print("\033[33mExternal subtitle track:\033[0m")
+    for it in external_sub:
+        is_default = " default" if it[4] else ""
+        print("\033[1;33m%s (%s) (%s) (%s)%s\033[0m" % (it[0], it[1], it[2], it[3], is_default))
+    choice = input("\033[1;36m确认上述信息无误(Y/n) (Y: 进入下一步 n: 重新进行选择): \033[0m")
+    if choice == 'Y' or choice == 'y':
+        return True
+    return False
+
+
+def check_resolution():
+    print("您要压制的选项如下：")
+    for k, v in conf.items():
+        if v != 0:
+            mode = "x264"
+            resolution = "1080"
+            if k == "x265":
+                mode = "x265"
+            else:
+                resolution = k
+            print("\033[1;34m{} ({}p): 帧率 {}\033[0m".format(mode, resolution, v))
+    choice = input("\033[1;36m确认上述信息无误(Y/n) (Y: 进入下一步 n: 重新进行选择): \033[0m")
+    if choice == 'Y' or choice == 'y':
+        return True
+    return False
+
+
+def match_info(num, res):
+    for line in res:
+        if re.match('^%d:(.*)?' % num, line):
+            return line
+
+
+def match_lang(num, res):
+    return match_info(num, res).split(',')[1].strip()
+
+
+def match_item_name(num, res):
+    for line in res:
+        if re.match('^%d:(.*)?' % num, line):
+            return line.split(':')[1].split(',')[0].strip()
+
+
+def check_subtitle(num, res):
+    return match_item_name(num, res).startswith("Subtitle")
+
+
+def select_resolution():
+    global conf
+    print("请选择您要压制的作品目标帧率，输入\033[1;31m0\033[0m表示不压制该选项")
+    choice = input("请输入x265 (1080p)的目标帧率（默认为\033[1;32m%s\033[0m）：" % conf["x265"])
+    if choice and choice.isdigit():
+        conf["x265"] = int(choice)
+
+    for resolution in ["480", "576", "720", "1080"]:
+        choice = input("请输入x264 (%sp)的目标帧率（默认为\033[1;32m%s\033[0m）：" % (resolution, conf[resolution]))
+        if choice and choice.isdigit():
+            conf[resolution] = int(choice)
+
+    with open("{}/config.json".format(output_dir), "w") as f:
+        f.write(json.dumps(conf, indent=4))
+
+
+def init(path):
+    global init_done, chapter_track, video_track, audio_track, sub_track, content, conf, eac_cmd, mkv_extract, is_mkv
+    is_mkv = True if path.endswith('mkv') else False  # 判断源是否为mkv文件
+    chapter_track = 1 if not is_mkv else 998
+    video_track = 2
+    audio_track = []
+    sub_track = []
+
+    if not content:
+        eac_cmd = eac3to + ' "' + title + '"'
+        mkv_extract = 'mkvextract "{}" tracks '.format(title)
+        res = os.popen(eac_cmd).read()
+        content = []
+        for line in res.split("\n")[:-1]:
+            if line.startswith("analyze"):
+                continue
+            content.append(line)
+        print('\n'.join(content))
+        if not is_mkv:
+            mpls_num = 0
+            for line in content:
+                if re.match(r'^(\d)+\).*', line):
+                    mpls_num += 1
+            choice = input("请选择mpls (1-%d): " % mpls_num)
+            eac_cmd = eac3to + ' "' + title + '" "%s)"' % choice
+        res = os.popen(eac_cmd).read()
+        content = []
+        for line in res.split("\n")[:-1]:
+            if line.startswith("analyze"):
+                continue
+            content.append(line)
+    for line in content:
+        if re.match(r'(.*)?Chapters(.*)?', line):
+            chapter_track = int(line.split(":")[0])
+        if re.match(r'(.*)?h264(.*)?', line):
+            video_track = int(line.split(":")[0])
+        print("%s" % line)
+    done = False
+    while not done:
+        tmp_audio_track = [2, "eng", "eac3to", "ac3", "", '']
+        choice = input("请输入你想添加的音轨编号 （输入 q 以停止添加音频）: ")
+        if choice == 'q':
+            done = True
+            break
+        if choice.isdigit():
+            tmp_audio_track[0] = int(choice)
+        else:
+            continue
+        tmp_audio_track[1] = match_lang(tmp_audio_track[0], content)[:3].lower()
+        tmp_info = match_info(tmp_audio_track[0], content)
+        if "DTS" in tmp_info or "PCM" in tmp_info:
+            tmp_audio_track[2] = "eac3to"
+            if "5.1 channels" in tmp_info:
+                tmp_audio_track[3] = "ac3"
+            elif "2.0 channels" in tmp_info:
+                tmp_audio_track[3] = "flac"
+                tmp_audio_track[4] = " -down16"
+        if "EAC3" in tmp_info:
+            tmp_audio_track[2] = "ffmpeg"
+            tmp_audio_track[3] = "eac3"
+        choice = input("请输入音轨语言（默认为\033[1;32m%s\033[0m）: " % tmp_audio_track[1])
+        if choice:
+            tmp_audio_track[1] = choice
+        audio_track.append(tmp_audio_track)
+        choice = input('请输入音轨名称（默认为无）：')
+        if choice:
+            tmp_audio_track[5] = choice
+    done = False
+    choice = ""
+    while not done and not choice:
+        choice = input("请输入你想添加的字幕编号（输入 q 以停止添加字幕）: ")
+        if choice == 'q':
+            done = True
+            break
+        if choice.isdigit():
+            num = int(choice)
+            if check_subtitle(num, content):
+                name = match_lang(num, content)
+                lang = name[:3].lower()
+            else:
+                continue
+        else:
+            continue
+
+        choice = input("请输入字幕语言（默认为\033[1;32m%s\033[0m）: " % lang)
+        if choice:
+            if choice == 'q':
+                done = True
+                break
+            lang = choice
+
+        choice = input("请输入字幕名（默认为\033[1;32m%s\033[0m）: " % name)
+        if choice:
+            if choice == 'q':
+                done = True
+                break
+            name = choice
+
+        is_default = False
+        choice = input("设置为默认字幕轨道吗？(Y/n) (默认为n）: ")
+        if choice:
+            if choice == 'Y' or choice == 'y':
+                is_default = True
+        num = num - 1 if is_mkv else num  # mkvextract 使用的编号比eac3to少一位
+        sub_track.append([num, lang, name, is_default, is_mkv])
+        choice = ""
+
+    init_done = check_tracks()
+
+    if "config.json" not in os.listdir(output_dir):
+        select_resolution()
+    else:
+        with open("{}/config.json".format(output_dir)) as f:
+            conf = json.loads(f.read())
+
+    if not check_resolution():
+        select_resolution()
+
+
+def demux(path):
+    global mkv_extract
+    cmd = eac_cmd
+
+    cmd += ' %d: "%s_%d.264"' % (video_track, title, video_track)
+    ffmpeg_cmd = ""
+    for audio in audio_track:
+        if audio[2] == "eac3to":
+            cmd += ' %d: "%s_%d%s.%s"%s' % (audio[0], title, audio[0], audio[1], audio[3], audio[4])
+        elif audio[2] == "ffmpeg":
+            if audio[3] == "eac3":
+                ffmpeg_cmd = '"%s" -i "%s" -map 0:%d -c:a eac3 -b:a 640k -dsurex_mode 2 "%s_%d%s.%s"' % (
+                    ffmpeg, mkv, audio[0] - 1, title, audio[0], audio[1], audio[3])
+            else:
+                print("Audio format error %d: %s" % (audio[0], audio[3]))
+                exit(-1)
+    print(cmd)
+    for sub in sub_track:
+        if not sub[4]:
+            cmd += ' %d: "%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
+        else:
+            mkv_extract += ' %d:"%s_%d%s.sup"' % (sub[0], title, sub[0], sub[1])
+    if is_mkv:
+        mkv_extract += ' chapters "%s_%d.txt"' % (title, chapter_track)
+    else:
+        cmd += ' %d: "%s_%d.txt"' % (chapter_track, title, chapter_track)
+    os.system(cmd)
+    if ffmpeg_cmd:
+        os.system(ffmpeg_cmd)
+    if is_mkv:
+        os.system(mkv_extract)
+
+
+def move(src, dst):
+    cmd = 'mv "%s" "%s"' % (src, dst)
+    os.system(cmd)
+
+
+def move_files(src, dst):
+    move("%s/%s_%d - Log.txt" % (src, title, chapter_track), dst)
+    move("%s/%s_%d.txt" % (src, title, chapter_track), dst)
+    move("%s/%s_%d.264" % (src, title, video_track), dst)
+    for audio in audio_track:
+        move("%s/%s_%d%s.%s" % (src, title, audio[0], audio[1], audio[3]), dst)
+    for sub in sub_track:
+        move("%s/%s_%d%s.sup" % (src, title, sub[0], sub[1]), dst)
+
+
+class Encoder(object):
+    def __init__(self, encode_script, merge_script):
+        self.encode_script = encode_script
+        self.merge_script = merge_script
+
+    def encode(self):
+        print("bash {}".format(self.encode_script))
+        os.system("bash {}".format(self.encode_script))
+
+    def merge(self):
+        print("bash {}".format(self.merge_script))
+        os.system("bash {}".format(self.merge_script))
+
+
+def generate_merge_script(name, group="HLW"):
+    merge_script = "{}/{}-{}-merge.sh".format(output_dir, title, name)
+    x264 = name != "x265"
+    with open(merge_script, "w") as f:
+        year = re.search("\.\d{4}\.", title)
+        if x264:
+            cmd = 'mkvmerge -o "%s/%s.mkv" \\\n   --title "%s" \\\n' % (
+                output_dir, title[0:year.span()[1]] + "{}p.BluRay.DD5.1.x264-{}".format(name, group),
+                title[0:year.span()[0]].replace(".", " ") + " [" + year.group(0).strip(".") + "] {}p BluRay-{}".format(
+                    name,
+                    group))
+        else:
+            cmd = 'mkvmerge -o "%s/%s.mkv" \\\n   --title "%s" \\\n' % (
+                output_dir, title[0:year.span()[1]] + "1080p.BluRay.x265.10bit.{}-FRDS".format(group),
+                title[0:year.span()[0]].replace(".", " ") + " [" + year.group(0).strip(
+                    ".") + "] BluRay 1080p {}-FRDS".format(group))
+        if not x264:
+            cmd += '   --ui-language zh_CN \\\n'
+        cmd += '   --chapters "%s_%d.txt" \\\n' % (title, chapter_track)
+        if x264:
+            cmd += '   --language 0:und "%s-%s.avc" \\\n' % (title, name)
+        else:
+            cmd += '   --language 0:und "%s-%s.hevc" \\\n' % (title, name)
+        default_audio = True
+        for audio in audio_track:
+            if default_audio:
+                cmd += '   --default-track 0:yes'
+                default_audio = False
+            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.%s" \\\n' % (
+                audio[5], audio[1], title, audio[0], audio[1], audio[3])
+        for sub in external_sub:
+            if sub[4] and not x264:
+                cmd += '   --default-track 0:yes'
+            else:
+                cmd += '   --default-track 0:no'
+            cmd += ' --track-name 0:"%s" --language 0:%s "%s_%s.%s" \\\n' % (
+                sub[0], sub[1], title, sub[2], sub[3])
+        for sub in sub_track:
+            if sub[3] and not x264:
+                cmd += '   --default-track 0:yes'
+            else:
+                cmd += '   --default-track 0:no'
+            cmd += '   --track-name 0:"%s" --language 0:%s "%s_%d%s.sup" \\\n' % (sub[2], sub[1], title, sub[0], sub[1])
+        cmd = cmd[:-2]
+        f.write(cmd)
+    return merge_script
+
+
+def test_crf(name, codec, crf_begin, target, step=1, old: dict = None, gap: int = 250):
+    cwd = os.getcwd()
+    bframes = 16
+    if codec == "x265":
+        bframes = 6
+
+    if "{}.log".format(name) not in os.listdir():
+        os.system("rm -rf crf")
+        os.chdir(vstest_path)
+        os.system("python3 vstest.py -codec {} -extract 85:2000:10000 --crf [{}/{}/{}] --bframes {}".format(codec,
+                                                                                                            crf_begin,
+                                                                                                            crf_begin,
+                                                                                                            step,
+                                                                                                            bframes))
+        os.chdir(cwd)
+        os.system("rm -rf crf")
+        os.system("mv {}.log {}.log".format(codec, name))
+    with open("{}.log".format(name)) as f:
+        content = f.read()
+        crf = list(map(lambda x: float(x), re.findall(r"--crf (.+?) ", content)))
+        bit_rate = list(map(lambda x: float(x), re.findall(r"encoded.+, (.+?) kb", content)))
+        if abs(bit_rate[0] - target) <= gap:
+            return crf[0]
+
+        if old:
+            crf += old['crf']
+            bit_rate += old['bit_rate']
+            crf.sort()
+            bit_rate.sort()
+            bit_rate.reverse()
+        if bit_rate[0] < target:
+            os.system("rm {}.log".format(name))
+            return test_crf(name, codec, crf_begin - step, target, step, old={'crf': crf, 'bit_rate': bit_rate})
+        if bit_rate[-1] >= target:
+            os.system("rm {}.log".format(name))
+            return test_crf(name, codec, crf_begin + step, target, step, old={'crf': crf, 'bit_rate': bit_rate})
+        num = 0
+        for i in range(len(bit_rate)):
+            if float(bit_rate[i]) < target:
+                num = i
+                break
+
+        print(name, bit_rate, crf)
+        f1 = np.polyfit(np.array(bit_rate), np.array(crf), 3)
+        p1 = np.poly1d(f1)
+        target_crf = p1(target)
+        if target_crf > crf[i] or target_crf < crf[i - 1]:
+            target_crf = (crf[i] + crf[i - 1]) / 2
+
+        target_crf = format(target_crf, '.1f')
+        return target_crf
+
+
+def detect_crf(name, codec, target):
+    cwd = os.getcwd()
+    os.chdir(vstest_path)
+    with open("vstestconfig.py.template") as f:
+        filename = "{}-{}.vpy".format(title, name)
+        vstestconfig = f.read()
+        vstestconfig = vstestconfig.replace("REPLACE_SCRIPT", "{}/{}".format(output_dir, filename))
+        vstestconfig = vstestconfig.replace("REPLACE_FOLDER", "{}/".format(output_dir))
+        with open("vstestconfig.py", "w") as ff:
+            ff.write(vstestconfig)
+    os.chdir(cwd)
+    step = 1
+    crf_begin = 17
+    crf_range = 3
+    if name == "x265":
+        crf_begin = 18
+        crf_range = 4
+    return test_crf(name, codec, crf_begin, target, step)
+
+
+def generate_vpy_helper(name, content, target):
+    codec = "x265"
+    if name != "x265":
+        codec = "x264"
+        content = content.replace("REPLACE_PRESET", name)
+        content = content.replace("encode_x264 = False", "encode_x264 = True")
+    filename = "{}-{}.vpy".format(title, name)
+    with open(filename, "w") as f:
+        f.write(content)
+    return detect_crf(name, codec, target)
+
+
+def generate_vpy(conf):
+    if f"{title}.ipynb" not in os.listdir("/scripts/"):
+        with open("/scripts/" + title + ".ipynb", "w") as f:
+            f.write(ipy.replace("REPLACE_PATH", "{}/{}_{}.264".format(output_dir, title, video_track)))
+        input("请修改jupyter中的{}.ipynb文件，确定切边条数，完成后按任意键继续".format(title))
+    with open("/scripts/" + title + ".ipynb") as f:
+        py = list(map(lambda x: x.strip('\n'), json.loads(f.read())['cells'][1]['source'][1:]))
+    content = "\n".join(py)
+    with open(title + ".vpy", "w") as f:
+        f.write(content)
+    crf_dict = {}
+    for k, v in conf.items():
+        if v != 0:
+            crf_dict[k] = generate_vpy_helper(k, content, v)
+    return crf_dict
+
+
+def get_frames():
+    frames = ""
+    frame_cmd = 'vspipe --y4m "%s/%s.vpy" -i -' % (output_dir, title)
+    tmp_res = os.popen(frame_cmd).read().split("\n")
+    for tmpl in tmp_res:
+        if tmpl.startswith("Frames"):
+            frames = " --frames " + tmpl.split()[1]
+    return frames
+
+
+def has_suffix_in_path(suffix, path=None):
+    if (path):
+        files = os.listdir(path)
+    else:
+        files = os.listdir()
+    for i in range(len(files)):
+        files[i] = os.path.splittext(files[i])[1]
+
+    if suffix in files:
+        return True
+    return False
+
+
+def main():
+    ts = time.time()
+    encoder = []
+
+    # demux and generate the scripts
+    os.chdir(os.path.dirname(path))
+
+    while not init_done:
+        init(path)
+    if "{}.ipynb".format(title) not in os.listdir("/scripts"):
+        demux(path)
+        move_files(os.getcwd(), output_dir)
+    os.chdir(output_dir)
+    crf_dict = generate_vpy(conf)
+    frames = get_frames()
+
+    for k, v in conf.items():
+        if v == 0:
+            continue
+        if k == "x265":
+            # 265
+            encode_tool = "x265"
+            demuxer = "--y4m"
+            encode_parameter = x265_parameter
+            suffix = "hevc"
+        else:
+            # 264
+            encode_tool = "x264"
+            demuxer = "--demuxer y4m"
+            encode_parameter = x264_parameter
+            suffix = "avc"
+
+        encode_script = "{}/{}-{}.sh".format(output_dir, title, k)
+        with open(encode_script, "w") as f:
+            f.write('vspipe --y4m "%s/%s-%s.vpy" - | %s %s --output "%s/%s-%s.%s" - --crf %s %s' % (
+                output_dir, title, k, encode_tool, demuxer, output_dir, title, k, suffix, crf_dict[k],
+                encode_parameter))
+            if frames:
+                f.write(frames)
+        merge_script = generate_merge_script(k)
+        encoder.append(Encoder(encode_script, merge_script))
+
+    for it in encoder:
+        it.encode()
+        it.merge()
+
+    os.system("mkdir -p {}/torrent".format(output_dir))
+    for i in os.listdir(output_dir):
+        if i.endswith(".mkv"):
+            os.system("mediainfo {} > {}/torrent/{}.txt".format(i, output_dir, i))
+            os.system("mktorrent -a \"x\" -l 22 -p {}".format(i))
+    os.system("mv *.torrent torrent")
+
+    # os.system("rm -f {}/*.vpy {}/*.sh".format(output_dir, output_dir))
+    # print("rm -f {}/*.vpy {}/*.sh".format(output_dir, output_dir))
+    # print("rm -f /scripts/{}.vpy".format(title))
+    te = time.time()
+    print("压制完成，耗时{}，请查看{}目录".format(format_time(te - ts), output_dir))
+
+
+if __name__ == "__main__":
+    main()
