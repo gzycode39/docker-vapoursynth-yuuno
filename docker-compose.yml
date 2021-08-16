@@ -1,7 +1,7 @@
 version: "2.1"
 services:
     vapoursynth-yuuno:
-        image: yyfyyf/vapoursynth-yuuno:v1.3
+        image: yyfyyf/vapoursynth-yuuno:v1.4
         container_name: vapoursynth-yuuno
         environment:
             - PUID=1000
@@ -9,6 +9,7 @@ services:
         volumes:
             - /YOUR/ENCODE/PATH:/encode
             - ./scripts:/scripts
+            - ./scripts/hlw:/usr/local/bin/hlw
         ports:
             - 8888:8888
         restart: unless-stopped
