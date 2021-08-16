@@ -154,6 +154,7 @@ sub_track = []
 eac_cmd = ""
 mkv_extract = ""
 is_mkv = False
+encoder = 'HLW'
 
 conf = {"x265": 7500, "480": 2000, "576": 3500, "720": 6500, "1080": 11000}
 
@@ -426,7 +427,7 @@ class Encoder(object):
         os.system("bash {}".format(self.merge_script))
 
 
-def generate_merge_script(name, group="Hydraulic"):
+def generate_merge_script(name, group=encoder):
     merge_script = "{}/{}-{}-merge.sh".format(output_dir, title, name)
     x264 = name != "x265"
     with open(merge_script, "w") as f:
