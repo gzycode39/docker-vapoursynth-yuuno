@@ -12,6 +12,7 @@ services:
             - ./scripts/hlw:/usr/local/bin/hlw
         ports:
             - 8888:8888
+        privileged: true
         restart: unless-stopped
         tty: true
         entrypoint: ["./jupyter.sh"]
